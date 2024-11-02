@@ -15,7 +15,12 @@ func bytes2json(data *[]byte) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	return jsonData.(map[string]interface{}), nil
+	ret, ok := jsonData.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("unexpected json format")
+	}
+
+	return ret, nil
 }
 
 // ResultParser is interface for parsing result from response.
@@ -128,7 +133,21 @@ func (parser *StandardResultParser) Parse(resp_ *[]byte) (*SolrResult, error) {
 	}
 	response := new(SolrResponse)
 	response.Response = jsonbuf
-	response.Status = int(jsonbuf["responseHeader"].(map[string]interface{})["status"].(float64))
+	{
+		responseHeader, ok := jsonbuf["responseHeader"].(map[string]interface{})
+		if !ok || responseHeader == nil {
+			return nil, fmt.Errorf("unexpected responseHeader value. %v", jsonbuf["responseHeader"])
+		}
+		statusRaw, ok := responseHeader["status"]
+		if !ok || statusRaw == nil {
+			return nil, fmt.Errorf("unexpected status value. %v", responseHeader["status"])
+		}
+		status, ok := statusRaw.(float64)
+		if !ok {
+			return nil, fmt.Errorf("unexpected status value. %v", statusRaw)
+		}
+		response.Status = int(status)
+	}
 
 	sr.Results = new(Collection)
 	sr.Status = response.Status
